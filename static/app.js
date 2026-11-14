@@ -1030,7 +1030,7 @@ window.SQLX = {
   },
   // words and defaults for the shared Graph code
   rowWord: "applications",
-  countLabel: "Number of applications",
+  countLabel: "Count",
   tableName: "the table",
   emptyMessage: "Add an application to chart it.",
   emptySummary: "Add an application to chart it",

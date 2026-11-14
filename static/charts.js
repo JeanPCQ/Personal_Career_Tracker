@@ -37,12 +37,12 @@
   const NO_DATE = "(No date)";
 
   const CALCS = [
-    { id: "sum", label: "Total", stack: true },
+    { id: "sum", label: "Sum", stack: true },
     { id: "avg", label: "Average", stack: false },
     { id: "count", label: COUNT_LABEL, stack: true },
-    { id: "distinct", label: "Distinct count", stack: true },
-    { id: "max", label: "Highest", stack: false },
-    { id: "min", label: "Lowest", stack: false },
+    { id: "distinct", label: "Count Distinct", stack: true },
+    { id: "max", label: "Max", stack: false },
+    { id: "min", label: "Min", stack: false },
   ];
   const GRAINS = [
     { id: "day", label: "Day" },
@@ -157,7 +157,8 @@
     ...meta.filter((m) => !m.numeric && !m.date),
     ...meta.filter((m) => m.numeric && m.distinct <= MAX_X_NUMERIC),
   ];
-  const splitColumns = (x) => meta.filter((m) => !m.date && m.name !== x && m.distinct >= 2 && m.distinct <= MAX_SPLIT);
+  const splitColumns = (x) => meta.filter((m) =>
+    !m.date && m.name !== x && (m.distinct >= 2 || m.name === HOST.defaultSplit) && m.distinct <= MAX_SPLIT);
 
   function guessConfig() {
     const date = meta.find((m) => m.date);
@@ -227,7 +228,7 @@
 
   const valueName = (cfg) =>
     cfg.calc === "count" ? COUNT_LABEL
-    : cfg.calc === "distinct" ? `Distinct count of ${cfg.measure}`
+    : cfg.calc === "distinct" ? `Count Distinct of ${cfg.measure}`
     : `${calcOf(cfg.calc).label} ${cfg.measure}`;
 
   function describe(cfg) {
@@ -635,7 +636,7 @@
     const canStack = calcOf(config.calc).stack;
     ui.stacked.disabled = !canStack;
     ui.stacked.checked = canStack && config.stacked;
-    ui.stackPart.title = canStack ? "" : `Stacking only adds up for Total, ${COUNT_LABEL} and Distinct count.`;
+    ui.stackPart.title = canStack ? "" : `Stacking only adds up for Sum, ${COUNT_LABEL} and Count Distinct.`;
 
     // saved charts for this query
     const list = savedFor();
