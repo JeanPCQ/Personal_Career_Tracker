@@ -12,14 +12,17 @@ Or double-click run.bat. Your browser opens at http://127.0.0.1:5001
 
 ## Your data
 
-Everything is saved in the `data` folder, created on first run:
+On first run, choose where to save your data. By default, Job Tracker recommends
+`~/JobTrackerData`, outside the project folder. The database, contacts, notes,
+and PDF attachments stay there on your computer; they are not saved to GitHub.
+The selected folder path is remembered in `~/.job-tracker/config.json`.
 
-    data\jobs.db     applications, contacts and notes (SQLite, one file)
-    data\files\      the PDFs you attach
+To back up, copy the selected data folder. To move to another computer, copy
+that folder and select it during setup on the other computer. A missing saved
+folder is reported at startup, with the recommended location shown.
 
-To back up, copy the `data` folder. To move to another computer, copy the
-whole job_tracker folder including `data`. When you update the app, keep
-your `data` folder.
+The app does not import an older `data` folder from inside the project. That
+folder is ignored by Git as a safeguard for local data.
 
 ## Using it
 

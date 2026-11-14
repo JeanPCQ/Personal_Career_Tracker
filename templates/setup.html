@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose a data folder · Job Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tracker.css') }}">
+</head>
+<body class="setup-page">
+  <main class="setup-card">
+    <p class="setup-kicker">First-run setup</p>
+    <h1>Choose where Job Tracker saves data</h1>
+    <p>The application database and PDF attachments will stay in this folder on your computer, outside the project folder. They are not uploaded to GitHub.</p>
+
+    {% if missing_dir %}
+    <div class="notice error" role="alert">
+      <strong>Saved folder not found.</strong>
+      Job Tracker could not locate <code>{{ missing_dir }}</code>. Reconnect that drive or choose a new folder below. The recommended new location is <code>{{ recommended_dir }}</code>.
+    </div>
+    {% endif %}
+
+    {% if error and not missing_dir %}
+    <div class="notice error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form class="setup-form" method="post" action="{{ url_for('setup_storage') }}">
+      <label class="field" for="data-dir">Data folder
+        <input id="data-dir" name="data_dir" type="text" value="{{ data_dir }}" required autocomplete="off" spellcheck="false">
+      </label>
+      <p class="setup-hint">The default is <code>{{ recommended_dir }}</code>. You can use an absolute path or a path starting with <code>~</code>.</p>
+      <button type="submit" class="btn btn-primary">Create folder and continue</button>
+    </form>
+
+    <p class="setup-footnote">This project runs locally. Each person who uses it can choose a separate folder. Job Tracker remembers only the folder path in a small settings file in your home directory.</p>
+  </main>
+</body>
+</html>
