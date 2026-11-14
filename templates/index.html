@@ -110,11 +110,20 @@
       <label class="field">Status <select name="status" class="status-pick"></select></label>
       <label class="field">Applied date <input name="applied_date" type="date"></label>
       <label class="field">Post date <input name="post_date" type="date"></label>
-      <label class="field">Job link <input name="job_url" type="url" placeholder="https://" autocomplete="off"></label>
+      <label class="field">Follow-up date <input name="follow_up_date" type="date"></label>
+      <label class="field">Location <input name="location" placeholder="City, Remote, Hybrid" autocomplete="off"></label>
+      <label class="field">Salary <input name="salary" placeholder="e.g. $85,000 to $95,000" autocomplete="off"></label>
+      <label class="field span-2">Job link <input name="job_url" type="url" placeholder="https://" autocomplete="off"></label>
+      <label class="field span-2">Job description
+        <textarea name="description" class="add-text" rows="4" placeholder="Paste the job posting here so you still have it after it's taken down."></textarea>
+      </label>
+      <label class="field span-2">Notes
+        <textarea name="notes" class="add-text" rows="3" placeholder="Interview questions, who you spoke to, what to follow up on…"></textarea>
+      </label>
       <p id="add-error" class="form-error span-2" role="alert"></p>
     </div>
     <footer class="modal-foot">
-      <span class="muted">Everything else can be filled in after.</span>
+      <span class="muted">You can edit these details later.</span>
       <div class="foot-buttons">
         <button type="button" class="btn btn-quiet" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Add application</button>

@@ -350,6 +350,7 @@ dialog.modal[open] { animation: pop .14s ease-out; }
   font-weight: 400;
 }
 .field textarea { height: auto; padding: 8px 10px; resize: vertical; line-height: 1.5; }
+.add-text { min-height: 96px; }
 .field .status-pick { height: 36px; border-radius: var(--radius); font-size: 14px; }
 .field input:focus, .field textarea:focus, .big-text:focus {
   outline: none;

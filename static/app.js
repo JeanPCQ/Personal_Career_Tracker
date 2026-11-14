@@ -565,7 +565,10 @@ addForm.addEventListener("submit", async (e) => {
   const f = addForm.elements;
   const body = {
     company: f.company.value.trim(), title: f.title.value.trim(), status: f.status.value,
-    applied_date: f.applied_date.value, post_date: f.post_date.value, job_url: f.job_url.value.trim(),
+    applied_date: f.applied_date.value, post_date: f.post_date.value,
+    follow_up_date: f.follow_up_date.value, location: f.location.value.trim(),
+    salary: f.salary.value.trim(), job_url: f.job_url.value.trim(),
+    description: f.description.value.trim(), notes: f.notes.value.trim(),
   };
   if (!body.company || !body.title) {
     $("#add-error").textContent = "Company and job title are both needed.";
