@@ -1,0 +1,252 @@
+/* ==========================================================================
+   SQL Explorer: Graph section, drag handles, Table Data heading.
+   Uses the colour tokens from style.css.
+   ========================================================================== */
+
+/* ---- spacing: the drag handles now separate the sections ---------------- */
+
+.workspace { gap: 0; }
+.query-head { margin-bottom: 14px; }
+.main { overflow: auto; }
+.results { min-height: 140px; }
+.grid-wrap { min-height: 100px; }
+
+/* ---- drag handles -------------------------------------------------------- */
+
+.splitter {
+  flex: none;
+  position: relative;
+  height: 14px;
+  cursor: row-resize;
+  touch-action: none;
+}
+.splitter::before {               /* the grip */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: var(--rule);
+  transition: background .12s ease, width .12s ease;
+}
+.splitter:hover::before,
+.splitter:focus-visible::before,
+.splitter.dragging::before {
+  width: 72px;
+  background: var(--accent);
+}
+.splitter:focus-visible { box-shadow: none; }
+body.resizing { cursor: row-resize; user-select: none; }
+body.resizing * { cursor: row-resize !important; }
+
+/* ---- Graph section --------------------------------------------------------- */
+
+.graph-panel {
+  flex: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.graph-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 6px 8px 6px 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+}
+.graph-panel > summary::-webkit-details-marker { display: none; }
+.graph-panel > summary::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform .12s ease;
+  flex: none;
+}
+.graph-panel[open] > summary::before { transform: rotate(45deg); }
+#graph-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-body {
+  display: flex;
+  flex-direction: column;
+  height: 380px;              /* default; the drag handle overrides it */
+  min-height: 220px;
+  padding: 12px 14px 10px;
+  border-top: 1px solid var(--rule-soft);
+  overflow: hidden;
+}
+
+.graph-message {
+  margin: auto;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* the sentence: Show [Total] of [Qty] by [Month] of [Demand Date] split by [nothing] */
+.graph-controls { flex: none; }
+.sentence {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 2.1;
+}
+.sentence .part[hidden] { display: none; }
+.pick {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 30px;
+  max-width: 260px;
+  padding: 0 26px 0 8px;
+  margin: 0 2px;
+  border: 0;
+  border-bottom: 2px solid var(--accent);
+  border-radius: 4px 4px 0 0;
+  background: var(--sunken)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235A6676' stroke-width='1.5'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.pick:hover { background-color: var(--hover); }
+
+.graph-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.graph-tools .spacer { flex: 1; }
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.seg button {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button:hover { background: var(--hover); }
+.seg button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.stack-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.stack-opt[hidden] { display: none; }
+.stack-opt:has(input:disabled) { color: var(--muted); cursor: default; }
+
+.saved-pick {
+  height: 28px;
+  max-width: 200px;
+  padding: 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13px;
+}
+.saved-pick:disabled { color: var(--muted); }
+
+.save-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.save-form[hidden] { display: none; }
+.save-form input {
+  flex: 1;
+  max-width: 320px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.graph-filters {
+  flex: none;
+  margin: 10px 0 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.graph-filters mark {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--mark);
+  color: var(--mark-ink);
+}
+
+.graph-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.graph-canvas canvas { position: absolute; inset: 0; }
+.graph-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--surface);
+}
+.graph-empty[hidden] { display: none; }
+
+.graph-notes {
+  flex: none;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.graph-notes:empty { display: none; }
+
+/* ---- Table Data heading --------------------------------------------------- */
+
+.table-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-height: 34px;
+}
+.table-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.table-head .results-bar { flex: 1; }
+
+@media (max-width: 760px) {
+  .graph-body { height: 420px; }
+  .sentence { font-size: 14px; }
+}

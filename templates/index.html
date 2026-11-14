@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="../static/style.css">
+  <link rel="stylesheet" href="../static/charts.css">
+  <link rel="stylesheet" href="../static/tracker.css">
+</head>
+<body>
+<div id="not-served" class="not-served" hidden>
+  <h1>Start Job Tracker with Python</h1>
+  <p>This page was opened as a file, so it can't reach your saved applications.</p>
+  <ol>
+    <li>Double-click <strong>run.bat</strong> in the job_tracker folder, or run <code>python app.py</code> there.</li>
+    <li>Your browser opens <a href="http://127.0.0.1:5001">http://127.0.0.1:5001</a>. Use that address, not this file.</li>
+  </ol>
+</div>
+
+<div id="app" class="app">
+
+  <header class="topbar">
+    <div class="brand">Job Tracker</div>
+    <div class="search">
+      <label for="search" class="visually-hidden">Search applications</label>
+      <input id="search" type="search" placeholder="Search company, title, contacts, notes" autocomplete="off">
+      <kbd class="search-key" aria-hidden="true">/</kbd>
+    </div>
+    <button id="add-btn" type="button" class="btn btn-primary">Add application</button>
+  </header>
+
+  <main class="main">
+    <nav id="status-chips" class="status-chips" aria-label="Show applications by status"></nav>
+
+    <details id="graph-panel" class="graph-panel">
+      <summary>
+        <span class="section-title">Graph</span>
+        <span id="graph-summary" class="muted">Set up a chart</span>
+      </summary>
+      <div id="graph-body" class="graph-body"></div>
+    </details>
+
+    <div class="splitter" data-resize="graph" role="separator" aria-orientation="horizontal"
+         aria-label="Resize the Graph section" tabindex="0" title="Drag to resize. Double-click to reset."></div>
+
+    <section class="results" aria-live="polite">
+      <div class="table-head">
+        <h2 class="table-title">Applications</h2>
+        <div class="results-bar">
+          <div class="stats"><strong id="row-count"></strong></div>
+          <div id="filter-chips" class="chips"></div>
+          <div class="bar-actions">
+            <button id="download-csv" type="button" class="btn btn-quiet">Download CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="grid-wrap" class="grid-wrap" hidden>
+        <table id="grid" class="grid"></table>
+      </div>
+
+      <div id="pager" class="pager" hidden>
+        <span id="pager-label"></span>
+        <div class="pager-buttons">
+          <button type="button" class="btn btn-quiet btn-small" data-page="first">First</button>
+          <button type="button" class="btn btn-quiet btn-small" data-page="prev">Previous</button>
+          <button type="button" class="btn btn-quiet btn-small" data-page="next">Next</button>
+          <button type="button" class="btn btn-quiet btn-small" data-page="last">Last</button>
+        </div>
+      </div>
+
+      <div id="results-empty" class="results-empty" hidden>
+        <div>
+          <p class="empty-title">No applications yet</p>
+          <p>Add the first job you applied to, and it shows up here.</p>
+          <button type="button" class="btn btn-primary" data-action="add">Add application</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Column filter (same as SQL Explorer) -->
+<div id="filter-pop" class="filter-pop" role="dialog" aria-modal="false" aria-labelledby="filter-title" hidden>
+  <div class="filter-head"><span id="filter-title"></span></div>
+  <input id="filter-search" type="search" placeholder="Search values" autocomplete="off">
+  <label class="filter-all"><input id="filter-all" type="checkbox"> <span>Select all</span></label>
+  <div id="filter-list" class="filter-list"></div>
+  <p id="filter-note" class="filter-note"></p>
+  <div class="filter-actions">
+    <button id="filter-clear" type="button" class="btn btn-quiet btn-small">Clear filter</button>
+    <button id="filter-apply" type="button" class="btn btn-primary btn-small">Apply</button>
+  </div>
+</div>
+
+<!-- Add application -->
+<dialog id="add-dialog" class="modal modal-small" aria-labelledby="add-title">
+  <form id="add-form" class="modal-inner" method="dialog" novalidate>
+    <header class="modal-head">
+      <h2 id="add-title">Add application</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">&times;</button>
+    </header>
+    <div class="modal-body form-grid">
+      <label class="field span-2">Company <input name="company" required autocomplete="off"></label>
+      <label class="field span-2">Job title <input name="title" required autocomplete="off"></label>
+      <label class="field">Status <select name="status" class="status-pick"></select></label>
+      <label class="field">Applied date <input name="applied_date" type="date"></label>
+      <label class="field">Post date <input name="post_date" type="date"></label>
+      <label class="field">Job link <input name="job_url" type="url" placeholder="https://" autocomplete="off"></label>
+      <p id="add-error" class="form-error span-2" role="alert"></p>
+    </div>
+    <footer class="modal-foot">
+      <span class="muted">Everything else can be filled in after.</span>
+      <div class="foot-buttons">
+        <button type="button" class="btn btn-quiet" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add application</button>
+      </div>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Application details: opened by clicking an ID -->
+<dialog id="detail" class="modal" aria-labelledby="detail-title">
+  <div class="modal-inner">
+    <header class="modal-head">
+      <div class="detail-heading">
+        <p class="detail-id" id="detail-id"></p>
+        <h2 id="detail-title"></h2>
+        <p class="detail-company" id="detail-company"></p>
+      </div>
+      <div class="detail-head-actions">
+        <label class="visually-hidden" for="detail-status">Status</label>
+        <select id="detail-status" class="status-pick" data-field="status"></select>
+        <button type="button" class="icon-btn" data-close aria-label="Close (Esc)">&times;</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Application details">
+      <button type="button" role="tab" data-tab="info">Job info</button>
+      <button type="button" role="tab" data-tab="description">Job description</button>
+      <button type="button" role="tab" data-tab="contacts">Contacts <span class="tab-count" id="contacts-count"></span></button>
+      <button type="button" role="tab" data-tab="notes">Notes</button>
+      <button type="button" role="tab" data-tab="files">PDF attachments <span class="tab-count" id="files-count"></span></button>
+    </nav>
+
+    <div class="modal-body">
+      <section role="tabpanel" data-panel="info" class="form-grid">
+        <label class="field span-2">Company <input data-field="company" autocomplete="off"></label>
+        <label class="field span-2">Job title <input data-field="title" autocomplete="off"></label>
+        <label class="field">Location <input data-field="location" placeholder="City, Remote, Hybrid" autocomplete="off"></label>
+        <label class="field">Salary <input data-field="salary" placeholder="e.g. $85,000 to $95,000" autocomplete="off"></label>
+        <label class="field span-2">Job link
+          <span class="input-with-btn">
+            <input data-field="job_url" type="url" placeholder="https://" autocomplete="off">
+            <a id="open-link" class="btn btn-quiet" target="_blank" rel="noopener" hidden>Open</a>
+          </span>
+        </label>
+        <label class="field">Post date <input data-field="post_date" type="date"></label>
+        <label class="field">Applied date <input data-field="applied_date" type="date"></label>
+        <label class="field">Follow-up date <input data-field="follow_up_date" type="date"></label>
+        <p class="field-hint">Follow-up dates that are due show in yellow in the table, and overdue ones in red.</p>
+      </section>
+
+      <section role="tabpanel" data-panel="description" hidden>
+        <label class="visually-hidden" for="f-description">Job description</label>
+        <textarea id="f-description" data-field="description" class="big-text"
+                  placeholder="Paste the job posting here so you still have it after it's taken down."></textarea>
+      </section>
+
+      <section role="tabpanel" data-panel="contacts" hidden>
+        <div id="contact-list" class="contact-list"></div>
+        <button id="add-contact" type="button" class="btn btn-quiet">Add contact</button>
+      </section>
+
+      <section role="tabpanel" data-panel="notes" hidden>
+        <label class="visually-hidden" for="f-notes">Notes</label>
+        <textarea id="f-notes" data-field="notes" class="big-text"
+                  placeholder="Interview questions, who you spoke to, what to follow up on…"></textarea>
+      </section>
+
+      <section role="tabpanel" data-panel="files" hidden>
+        <div id="file-slots" class="file-slots"></div>
+      </section>
+    </div>
+
+    <footer class="modal-foot">
+      <span id="save-state" class="save-state" aria-live="polite"></span>
+      <button id="delete-app" type="button" class="btn-danger-link">Delete application</button>
+    </footer>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script src="../static/chart.umd.min.js"></script>
+<script src="../static/app.js"></script>
+<script src="../static/layout.js"></script>
+<script src="../static/charts.js"></script>
+</body>
+</html>
