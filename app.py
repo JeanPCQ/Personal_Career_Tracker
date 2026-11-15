@@ -1,8 +1,8 @@
 """
 Job Tracker
 Track job applications on your own computer: a table with a status
-dropdown, a pop-up with job info, job description, contacts, notes and
-PDF attachments, and charts.
+dropdown, a pop-up with job info, job description, contacts, a dated log
+and PDF attachments, and charts.
 
 On first run, choose a folder outside this project for the database and
 PDFs. The folder location is remembered in your home directory.
@@ -82,7 +82,7 @@ APP_FIELDS = {
     "company": "Company", "title": "Job title", "status": "Status",
     "location": "Location", "salary": "Salary", "job_url": "Job link",
     "post_date": "Post date", "applied_date": "Applied date", "follow_up_date": "Follow-up date",
-    "description": "Job description", "notes": "Notes",
+    "description": "Job description",
 }
 DATE_FIELDS = {"post_date", "applied_date", "follow_up_date"}
 CONTACT_FIELDS = ["name", "role", "email", "phone", "linkedin", "notes"]
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS applications (
     applied_date    TEXT,
     follow_up_date  TEXT,
     description     TEXT NOT NULL DEFAULT '',
-    notes           TEXT NOT NULL DEFAULT '',
+    notes           TEXT NOT NULL DEFAULT '',             -- migrated to logs on database initialization
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS contacts (
     created_at      TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS logs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id  INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    log_date        TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    notes           TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS attachments (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id  INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -129,6 +139,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_contacts_application ON contacts(application_id);
+CREATE INDEX IF NOT EXISTS idx_logs_application ON logs(application_id, log_date, id);
 """
 
 app = Flask(__name__)
@@ -183,6 +194,23 @@ def init_db(data_dir: Optional[Path] = None) -> None:
     (data_dir / "files").mkdir(parents=True, exist_ok=True, mode=0o700)
     with sqlite3.connect(data_dir / "jobs.db") as conn:
         conn.executescript(SCHEMA)
+        legacy_notes = conn.execute(
+            "SELECT id, status, notes FROM applications WHERE trim(notes) <> ''"
+        ).fetchall()
+        if legacy_notes:
+            stamp = now()
+            log_date = dt.date.today().isoformat()
+            conn.executemany(
+                """INSERT INTO logs
+                   (application_id, log_date, status, notes, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [(app_id, log_date, status, notes, stamp, stamp)
+                 for app_id, status, notes in legacy_notes],
+            )
+            conn.executemany(
+                "UPDATE applications SET notes = '' WHERE id = ?",
+                [(app_id,) for app_id, _, _ in legacy_notes],
+            )
 
 
 def save_storage_config(data_dir: Path) -> None:
@@ -291,6 +319,32 @@ def clean_contact(body: dict) -> dict:
     return out
 
 
+def clean_log(body: dict, partial: bool) -> dict:
+    if not isinstance(body, dict):
+        raise ApiError("A log must be an object.")
+    out = {}
+    for field in ("log_date", "status", "notes"):
+        if field not in body:
+            continue
+        value = str(body[field] or "").strip()
+        if field == "log_date":
+            if not value:
+                raise ApiError("Log date can't be empty.")
+            try:
+                dt.date.fromisoformat(value)
+            except ValueError:
+                raise ApiError("Log date must be a date.")
+        elif field == "status" and value not in STATUSES:
+            raise ApiError(f"Status must be one of: {', '.join(STATUSES)}.")
+        elif field == "notes" and not value:
+            raise ApiError("Log notes can't be empty.")
+        out[field] = value
+
+    if not partial and any(field not in out for field in ("log_date", "status", "notes")):
+        raise ApiError("A log needs a date, status, and notes.")
+    return out
+
+
 # ==============================================================================
 # SHAPING RESPONSES
 # ==============================================================================
@@ -307,6 +361,10 @@ def application_detail(app_id: int) -> dict:
     data = dict(get_application_row(app_id))
     data["contacts"] = [dict(r) for r in db().execute(
         "SELECT * FROM contacts WHERE application_id = ? ORDER BY id", (app_id,))]
+    data["logs"] = [dict(r) for r in db().execute(
+        "SELECT * FROM logs WHERE application_id = ? ORDER BY log_date DESC, id DESC", (app_id,))]
+    data["log_text"] = "\n".join(
+        f"{row['log_date']} [{row['status']}] {row['notes']}" for row in data["logs"])
     data["attachments"] = [attachment_json(r) for r in db().execute(
         "SELECT * FROM attachments WHERE application_id = ? ORDER BY kind DESC", (app_id,))]
     return data
@@ -409,7 +467,9 @@ def list_applications():
         SELECT a.*,
                (SELECT group_concat(c.name, ', ') FROM contacts c WHERE c.application_id = a.id) AS contact_names,
                (SELECT count(*) FROM contacts c WHERE c.application_id = a.id)                   AS contact_count,
-               (SELECT group_concat(t.kind) FROM attachments t WHERE t.application_id = a.id)    AS attachment_kinds
+               (SELECT group_concat(t.kind) FROM attachments t WHERE t.application_id = a.id)    AS attachment_kinds,
+               (SELECT group_concat(l.log_date || ' [' || l.status || '] ' || l.notes, char(10))
+                  FROM logs l WHERE l.application_id = a.id)                                     AS log_text
         FROM applications a
         ORDER BY a.id DESC
     """).fetchall()
@@ -418,12 +478,23 @@ def list_applications():
 
 @app.post("/api/applications")
 def create_application():
-    fields = clean_application(request.get_json(silent=True) or {}, partial=False)
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        body = {}
+    fields = clean_application(body, partial=False)
+    initial_log = str(body.get("initial_log") or body.get("notes") or "").strip()
     stamp = now()
     fields.update(created_at=stamp, updated_at=stamp)
     cols = ", ".join(fields)
     marks = ", ".join("?" for _ in fields)
     cur = db().execute(f"INSERT INTO applications ({cols}) VALUES ({marks})", tuple(fields.values()))
+    if initial_log:
+        db().execute(
+            """INSERT INTO logs
+               (application_id, log_date, status, notes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (cur.lastrowid, dt.date.today().isoformat(), fields["status"], initial_log, stamp, stamp),
+        )
     db().commit()
     return jsonify(application_detail(cur.lastrowid)), 201
 
@@ -455,6 +526,50 @@ def delete_application(app_id: int):
     for name in stored:
         (FILES_DIR / name).unlink(missing_ok=True)
     return jsonify({"deleted": app_id})
+
+
+# ==============================================================================
+# ROUTES: application logs
+# ==============================================================================
+
+@app.post("/api/applications/<int:app_id>/logs")
+def add_log(app_id: int):
+    get_application_row(app_id)
+    fields = clean_log(request.get_json(silent=True) or {}, partial=False)
+    stamp = now()
+    fields.update(application_id=app_id, created_at=stamp, updated_at=stamp)
+    cols = ", ".join(fields)
+    marks = ", ".join("?" for _ in fields)
+    db().execute(f"INSERT INTO logs ({cols}) VALUES ({marks})", tuple(fields.values()))
+    touch(app_id)
+    db().commit()
+    return jsonify(application_detail(app_id)), 201
+
+
+@app.patch("/api/logs/<int:log_id>")
+def update_log(log_id: int):
+    row = db().execute("SELECT application_id FROM logs WHERE id = ?", (log_id,)).fetchone()
+    if row is None:
+        raise ApiError("That log doesn't exist.", 404)
+    fields = clean_log(request.get_json(silent=True) or {}, partial=True)
+    if fields:
+        fields["updated_at"] = now()
+        sets = ", ".join(f"{key} = ?" for key in fields)
+        db().execute(f"UPDATE logs SET {sets} WHERE id = ?", (*fields.values(), log_id))
+        touch(row["application_id"])
+        db().commit()
+    return jsonify(application_detail(row["application_id"]))
+
+
+@app.delete("/api/logs/<int:log_id>")
+def delete_log(log_id: int):
+    row = db().execute("SELECT application_id FROM logs WHERE id = ?", (log_id,)).fetchone()
+    if row is None:
+        raise ApiError("That log doesn't exist.", 404)
+    db().execute("DELETE FROM logs WHERE id = ?", (log_id,))
+    touch(row["application_id"])
+    db().commit()
+    return jsonify(application_detail(row["application_id"]))
 
 
 # ==============================================================================

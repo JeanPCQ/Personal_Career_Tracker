@@ -159,6 +159,23 @@
 .grid td { vertical-align: middle; }
 
 .col-id { width: 1%; }
+.col-link { width: 42px; }
+.grid td.col-link, .grid th.col-link { text-align: center; }
+.grid th.col-link { padding: 7px 8px; }
+.link-head { white-space: nowrap; }
+.job-link {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 17px;
+  line-height: 1;
+  text-decoration: none;
+}
+.job-link:hover { background: var(--hover); color: var(--accent-hover); }
+.job-link-empty { color: var(--muted); }
 .id-link {
   padding: 2px 6px;
   margin: -2px -6px;
@@ -435,6 +452,32 @@ dialog.modal[open] { animation: pop .14s ease-out; }
 .contact-actions { display: flex; gap: 14px; align-items: flex-start; flex: none; }
 
 .contact-form {
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--sunken);
+}
+
+/* ---- application log -------------------------------------------------------- */
+
+.log-list { display: grid; gap: 10px; margin-bottom: 14px; }
+.log-card {
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.log-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.log-meta, .log-actions { display: flex; align-items: center; gap: 10px; }
+.log-meta { color: var(--muted); font-size: 12.5px; }
+.log-status {
+  padding: 2px 9px;
+  border-radius: 12px;
+  background: var(--st-soft, var(--sunken));
+  color: var(--st, var(--ink));
+  font-weight: 600;
+}
+.log-note { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.log-form {
   padding: 14px;
   border: 1px solid var(--accent);
   border-radius: var(--radius);

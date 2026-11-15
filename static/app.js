@@ -174,7 +174,7 @@ function rebuildRows() {
   state.rows = state.apps.map((a) => COLUMNS.map((c) => (isBlank(a[c.key]) ? null : a[c.key])));
   state.chartRows = state.rows.map((r) => r.slice(1));
   state.searchText = state.apps.map((a) =>
-    [idLabel(a.id), a.company, a.title, a.status, a.location, a.salary, a.contact_names, a.notes, a.description]
+    [idLabel(a.id), a.company, a.title, a.status, a.location, a.salary, a.contact_names, a.log_text, a.description]
       .filter(Boolean).join("\n").toLowerCase());
   state.numeric = COLUMNS.map((c) => c.type === "id");
 }
@@ -186,8 +186,11 @@ function upsertApp(detail) {
     contact_names: (detail.contacts || []).map((c) => c.name).filter(Boolean).join(", ") || null,
     contact_count: (detail.contacts || []).length,
     attachment_kinds: (detail.attachments || []).map((a) => a.kind).join(",") || null,
+    log_text: detail.log_text ?? (detail.logs || []).map((log) =>
+      `${log.log_date} [${log.status}] ${log.notes}`).join("\n"),
   };
   delete listShape.contacts;
+  delete listShape.logs;
   delete listShape.attachments;
   const i = state.apps.findIndex((a) => a.id === detail.id);
   if (i >= 0) state.apps[i] = listShape;
@@ -331,13 +334,17 @@ function renderTable() {
       scope: "col", class: `col-${col.key}`,
       "aria-sort": sorted ? (state.sort.dir === 1 ? "ascending" : "descending") : false,
     }, el("div", { class: "th" }, sortBtn, filterBtn)));
+    if (col.key === "id") {
+      headRow.append(el("th", { scope: "col", class: "col-link" },
+        el("span", { class: "link-head" }, "Link")));
+    }
   });
 
   const tbody = el("tbody");
   const start = state.page * PAGE_SIZE;
   const slice = state.view.slice(start, start + PAGE_SIZE);
   if (!slice.length) {
-    tbody.append(el("tr", { class: "no-match" }, el("td", { colspan: COLUMNS.length },
+    tbody.append(el("tr", { class: "no-match" }, el("td", { colspan: COLUMNS.length + 1 },
       "No applications match. Clear the search or a filter to see more.")));
   }
   for (const ri of slice) tbody.append(renderRow(ri));
@@ -375,8 +382,25 @@ function renderRow(ri) {
       }
     }
     tr.append(td);
+    if (col.key === "id") tr.append(renderJobLink(app));
   });
   return tr;
+}
+
+function renderJobLink(app) {
+  const rawUrl = (app.job_url || "").trim();
+  const url = rawUrl && (/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`);
+  return el("td", { class: "col-link" },
+    url
+      ? el("a", {
+          class: "job-link",
+          href: url,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          title: "Open job posting",
+          "aria-label": `Open job posting for ${app.company}`,
+        }, "↗")
+      : el("span", { class: "job-link-empty", title: "No job link" }, "—"));
 }
 
 function renderPager() {
@@ -513,7 +537,7 @@ function downloadCsv() {
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const cols = [...COLUMNS.map((c) => [c.key, c.label]), ["salary", "Salary"], ["job_url", "Job link"],
-                ["contact_names", "Contacts"], ["notes", "Notes"]];
+                ["contact_names", "Contacts"], ["log_text", "Log"]];
   const lines = [cols.map(([, label]) => esc(label)).join(",")];
   for (const i of state.view) {
     const a = state.apps[i];
@@ -568,7 +592,7 @@ addForm.addEventListener("submit", async (e) => {
     applied_date: f.applied_date.value, post_date: f.post_date.value,
     follow_up_date: f.follow_up_date.value, location: f.location.value.trim(),
     salary: f.salary.value.trim(), job_url: f.job_url.value.trim(),
-    description: f.description.value.trim(), notes: f.notes.value.trim(),
+    description: f.description.value.trim(), initial_log: f.initial_log.value.trim(),
   };
   if (!body.company || !body.title) {
     $("#add-error").textContent = "Company and job title are both needed.";
@@ -594,7 +618,9 @@ const ui = {
   pending: {},            // fields typed but not saved yet
   timer: null,
   saving: Promise.resolve(),
+  logSaving: null,
   editingContact: null,   // contact id, "new", or null
+  editingLog: null,       // log id, "new", or null
   deleteArmed: false,
 };
 
@@ -606,6 +632,7 @@ async function openDetail(id, tab = "info") {
   ui.current = data;
   ui.pending = {};
   ui.editingContact = null;
+  ui.editingLog = null;
   disarmDelete();
   setSaveState("");
 
@@ -615,6 +642,7 @@ async function openDetail(id, tab = "info") {
   }
   renderDetailHeader();
   renderContacts();
+  renderLogs();
   renderFiles();
   setTab(tab);
   if (!detail.open) detail.showModal();
@@ -630,6 +658,7 @@ function renderDetailHeader() {
   link.hidden = !url;
   if (url) link.href = /^https?:\/\//i.test(url) ? url : "https://" + url;
   $("#contacts-count").textContent = a.contacts.length ? a.contacts.length : "";
+  $("#logs-count").textContent = a.logs.length ? a.logs.length : "";
   $("#files-count").textContent = a.attachments.length ? a.attachments.length : "";
 }
 
@@ -708,8 +737,10 @@ function flushSave() {
 
 detail.addEventListener("close", async () => {
   await saveOpenContactForm();
+  await saveOpenLogForm();
   await flushSave();
   disarmDelete();
+  ui.editingLog = null;
   ui.current = null;
 });
 
@@ -839,6 +870,149 @@ $("#add-contact").addEventListener("click", () => {
   ui.editingContact = "new";
   renderContacts();
   focusContactForm();
+});
+
+/* ---- application log */
+
+function renderLogs() {
+  const list = $("#log-list");
+  const logs = ui.current.logs || [];
+  list.replaceChildren();
+
+  if (!logs.length && ui.editingLog !== "new") {
+    list.append(el("p", { class: "panel-empty" }, "No log entries yet. Add the first update here."));
+  }
+  for (const log of logs) {
+    list.append(ui.editingLog === log.id ? logForm(log) : logCard(log));
+  }
+  if (ui.editingLog === "new") list.append(logForm(null));
+  $("#add-log").hidden = ui.editingLog !== null;
+}
+
+function logCard(log) {
+  const del = el("button", { type: "button", class: "btn-link danger" }, "Delete");
+  del.addEventListener("click", async () => {
+    if (!del.dataset.armed) {
+      del.dataset.armed = "1";
+      del.textContent = "Click again to delete";
+      setTimeout(() => {
+        if (del.isConnected) { delete del.dataset.armed; del.textContent = "Delete"; }
+      }, 4000);
+      return;
+    }
+    try {
+      const fresh = await api(`/api/logs/${log.id}`, { method: "DELETE" });
+      ui.current = fresh;
+      ui.editingLog = null;
+      renderLogs();
+      renderDetailHeader();
+      upsertApp(fresh);
+      toast("Deleted log entry");
+    } catch (e) { toast(e.message, true); }
+  });
+
+  return el("article", { class: "log-card" },
+    el("div", { class: "log-card-head" },
+      el("div", { class: "log-meta" },
+        el("time", { datetime: log.log_date }, fmtDate(log.log_date)),
+        el("span", { class: "log-status", dataset: { status: log.status } }, log.status)),
+      el("div", { class: "log-actions" },
+        el("button", {
+          type: "button", class: "btn-link",
+          onclick: () => { ui.editingLog = log.id; renderLogs(); },
+        }, "Edit"),
+        del)),
+    el("p", { class: "log-note" }, log.notes));
+}
+
+function logForm(log) {
+  const form = el("form", { class: "log-form form-grid", novalidate: true });
+  const date = el("input", { name: "log_date", type: "date", required: true });
+  date.value = log ? log.log_date : todayISO();
+  const status = el("select", { name: "status", class: "status-pick" });
+  fillStatusSelect(status, log ? log.status : ($("#detail-status").value || ui.current.status));
+  status.addEventListener("change", () => { status.dataset.status = status.value; });
+  const notes = el("textarea", {
+    name: "notes", rows: "4", required: true,
+    placeholder: "What happened?",
+  });
+  notes.value = log ? log.notes : "";
+
+  form.append(
+    el("label", { class: "field" }, "Date", date),
+    el("label", { class: "field" }, "Status", status),
+    el("label", { class: "field span-2" }, "Log notes", notes),
+    el("p", { class: "form-error span-2", role: "alert" }),
+    el("div", { class: "form-buttons span-2" },
+      el("button", { type: "submit", class: "btn btn-primary btn-small" }, log ? "Save log" : "Add log"),
+      el("button", {
+        type: "button", class: "btn btn-quiet btn-small",
+        onclick: () => { ui.editingLog = null; renderLogs(); },
+      }, "Cancel")));
+  form.dataset.original = JSON.stringify(readLogForm(form));
+  form.addEventListener("submit", (e) => { e.preventDefault(); saveLogForm(form, log); });
+  return form;
+}
+
+function readLogForm(form) {
+  return {
+    log_date: form.elements.log_date.value,
+    status: form.elements.status.value,
+    notes: form.elements.notes.value.trim(),
+  };
+}
+
+async function saveLogForm(form, log) {
+  if (ui.logSaving) return ui.logSaving;
+  const body = readLogForm(form);
+  const error = form.querySelector(".form-error");
+  if (!body.log_date || !body.notes) {
+    error.textContent = "A log needs a date and notes.";
+    (!body.log_date ? form.elements.log_date : form.elements.notes).focus();
+    return false;
+  }
+  for (const control of form.elements) control.disabled = true;
+  ui.logSaving = (async () => {
+    try {
+      const fresh = log
+        ? await api(`/api/logs/${log.id}`, { method: "PATCH", body })
+        : await api(`/api/applications/${ui.current.id}/logs`, { method: "POST", body });
+      ui.current = fresh;
+      ui.editingLog = null;
+      renderLogs();
+      renderDetailHeader();
+      upsertApp(fresh);
+      toast(log ? "Saved log entry" : "Added log entry");
+      return true;
+    } catch (e) {
+      error.textContent = e.message;
+      for (const control of form.elements) control.disabled = false;
+      return false;
+    } finally {
+      ui.logSaving = null;
+    }
+  })();
+  return ui.logSaving;
+}
+
+async function saveOpenLogForm() {
+  if (ui.logSaving) {
+    await ui.logSaving;
+    return;
+  }
+  const form = $(".log-form", detail);
+  if (!form || !ui.current) return;
+  const body = readLogForm(form);
+  if (form.dataset.original === JSON.stringify(body)) return;
+  if (ui.editingLog === "new" && !body.notes) return;
+  const log = ui.current.logs.find((item) => item.id === ui.editingLog) || null;
+  await saveLogForm(form, log);
+}
+
+$("#add-log").addEventListener("click", () => {
+  ui.editingLog = "new";
+  renderLogs();
+  $("textarea[name='notes']", $("#log-list")).focus();
 });
 
 /* ---- PDF attachments: one resume and one cover letter */

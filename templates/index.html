@@ -27,7 +27,7 @@
     <div class="brand">Job Tracker</div>
     <div class="search">
       <label for="search" class="visually-hidden">Search applications</label>
-      <input id="search" type="search" placeholder="Search company, title, contacts, notes" autocomplete="off">
+      <input id="search" type="search" placeholder="Search company, title, contacts, logs" autocomplete="off">
       <kbd class="search-key" aria-hidden="true">/</kbd>
     </div>
     <button id="add-btn" type="button" class="btn btn-primary">Add application</button>
@@ -117,9 +117,10 @@
       <label class="field span-2">Job description
         <textarea name="description" class="add-text" rows="4" placeholder="Paste the job posting here so you still have it after it's taken down."></textarea>
       </label>
-      <label class="field span-2">Notes
-        <textarea name="notes" class="add-text" rows="3" placeholder="Interview questions, who you spoke to, what to follow up on…"></textarea>
+      <label class="field span-2">Initial log
+        <textarea name="initial_log" class="add-text" rows="3" placeholder="Add an update, or leave this blank."></textarea>
       </label>
+      <p class="field-hint">An initial log uses the selected status and today's date. You can edit either later.</p>
       <p id="add-error" class="form-error span-2" role="alert"></p>
     </div>
     <footer class="modal-foot">
@@ -152,7 +153,7 @@
       <button type="button" role="tab" data-tab="info">Job info</button>
       <button type="button" role="tab" data-tab="description">Job description</button>
       <button type="button" role="tab" data-tab="contacts">Contacts <span class="tab-count" id="contacts-count"></span></button>
-      <button type="button" role="tab" data-tab="notes">Notes</button>
+      <button type="button" role="tab" data-tab="log">Log <span class="tab-count" id="logs-count"></span></button>
       <button type="button" role="tab" data-tab="files">PDF attachments <span class="tab-count" id="files-count"></span></button>
     </nav>
 
@@ -185,10 +186,9 @@
         <button id="add-contact" type="button" class="btn btn-quiet">Add contact</button>
       </section>
 
-      <section role="tabpanel" data-panel="notes" hidden>
-        <label class="visually-hidden" for="f-notes">Notes</label>
-        <textarea id="f-notes" data-field="notes" class="big-text"
-                  placeholder="Interview questions, who you spoke to, what to follow up on…"></textarea>
+      <section role="tabpanel" data-panel="log" hidden>
+        <div id="log-list" class="log-list"></div>
+        <button id="add-log" type="button" class="btn btn-quiet">Add log</button>
       </section>
 
       <section role="tabpanel" data-panel="files" hidden>

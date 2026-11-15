@@ -13,7 +13,7 @@ Or double-click run.bat. Your browser opens at http://127.0.0.1:5001
 ## Your data
 
 On first run, choose where to save your data. By default, Job Tracker recommends
-`~/JobTrackerData`, outside the project folder. The database, contacts, notes,
+`~/JobTrackerData`, outside the project folder. The database, contacts, logs,
 and PDF attachments stay there on your computer; they are not saved to GitHub.
 The selected folder path is remembered in `~/.job-tracker/config.json`.
 
@@ -29,7 +29,8 @@ folder is ignored by Git as a safeguard for local data.
 - The table is the home screen. Change a status right in the table.
 - The chips above the table filter by status; every column also has a funnel filter.
 - Click an ID (like #014) to open the pop-up: Job info, Job description,
-  Contacts, Notes, PDF attachments. Changes save as you type. Esc closes it.
+  Contacts, Log, PDF attachments. Log entries capture their date and status
+  and can be edited. Esc closes the pop-up.
 - PDF attachments: one resume and one cover letter per application.
   Drop a PDF on a slot, or use Choose file. Uploading again replaces it.
 - Follow-up dates show "Today" in yellow and "Overdue" in red, unless the
